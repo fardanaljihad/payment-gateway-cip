@@ -2,6 +2,16 @@ spring:
   application:
     name: payment-gateway-cip
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
   security:
     oauth2:
       resourceserver:

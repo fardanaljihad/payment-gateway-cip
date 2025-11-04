@@ -1,0 +1,38 @@
+services:
+  payment-gateway-db:
+    image: postgres:latest
+    container_name: payment-gateway-db
+    environment:
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: secret123
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db_volumes/payment-gateway-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_user -d db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  payment-gateway-cip: 
+    build: . 
+    container_name: payment-gateway-cip
+    environment: 
+      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-gateway-db:5432/db
+      SPRING_DATASOURCE_USERNAME: admin_user
+      SPRING_DATASOURCE_PASSWORD: secret123
+    ports: 
+      - "8080:8080"
+    depends_on: 
+      payment-gateway-db:
+        condition: service_healthy
+    networks: 
+      - internal
+
+networks:
+  internal:
+    driver: bridge
