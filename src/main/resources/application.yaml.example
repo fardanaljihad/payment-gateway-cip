@@ -16,7 +16,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8443/realms/oauth2-api-gateway
+          issuer-uri: ${ISSUER_URI:http://localhost:8443/realms/oauth2-api-gateway}
 
 external:
   corebank:

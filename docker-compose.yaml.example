@@ -18,6 +18,22 @@ services:
     networks:
       - internal
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.2
+    container_name: keycloak
+    command:
+      - start-dev
+      - --http-port=8443
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./keycloak_volumes:/opt/keycloak/data
+    networks:
+      - internal
+
   payment-gateway-cip: 
     build: . 
     container_name: payment-gateway-cip
@@ -25,11 +41,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://payment-gateway-db:5432/db
       SPRING_DATASOURCE_USERNAME: admin_user
       SPRING_DATASOURCE_PASSWORD: secret123
+      ISSUER_URI: http://keycloak:8443/realms/oauth2-api-gateway
     ports: 
       - "8080:8080"
     depends_on: 
       payment-gateway-db:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     networks: 
       - internal
 
