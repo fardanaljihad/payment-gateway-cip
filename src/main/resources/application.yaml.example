@@ -21,10 +21,10 @@ spring:
 external:
   corebank:
     name: corebank
-    url: http://localhost:8081
+    url: http://core-banking:8081
     path: /api/corebank
   
   biller:
     name: biller
-    url: http://localhost:8082
+    url: http://biller:8082
     path: /api/biller

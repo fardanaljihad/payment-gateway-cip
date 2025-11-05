@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - internal
+      - payment-gateway-cip
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.2
@@ -32,7 +32,7 @@ services:
     volumes:
       - ./keycloak_volumes:/opt/keycloak/data
     networks:
-      - internal
+      - payment-gateway-cip
 
   payment-gateway-cip: 
     build: . 
@@ -50,8 +50,8 @@ services:
       keycloak:
         condition: service_started
     networks: 
-      - internal
+      - payment-gateway-cip
 
 networks:
-  internal:
-    driver: bridge
+  payment-gateway-cip:
+    external: true
