@@ -38,3 +38,7 @@ db_volumes/
 
 docker-compose.yaml
 Dockerfile
+
+payment-requests.http
+
+.DS_Store

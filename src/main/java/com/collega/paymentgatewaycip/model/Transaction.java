@@ -1,7 +1,7 @@
 package com.collega.paymentgatewaycip.model;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import com.collega.paymentgatewaycip.enums.ChannelEnum;
@@ -60,8 +60,8 @@ public class Transaction {
     private String billerReference;
 
     @Column(name = "created_at")
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
-    private LocalDate updatedAt;
+    private LocalDateTime updatedAt;
 }
