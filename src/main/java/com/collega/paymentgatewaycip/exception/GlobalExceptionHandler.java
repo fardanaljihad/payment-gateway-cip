@@ -8,7 +8,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.collega.paymentgatewaycip.dto.PaymentResponse;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
@@ -35,12 +34,17 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<PaymentResponse> responseStatusException(
-        ResponseStatusException ex, HttpServletRequest req
-    ) {
+    public ResponseEntity<PaymentResponse> responseStatusException(ResponseStatusException ex) {
+
+        String status = "FAILED";
+
+        if (ex.getReason().equals("Transaction not found")) {
+            status = null;
+        }
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
             PaymentResponse.builder()
-                .status("FAILED")
+                .status(status)
                 .message(ex.getReason())
                 .build()
         );

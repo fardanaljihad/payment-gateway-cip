@@ -1,6 +1,7 @@
 package com.collega.paymentgatewaycip.service;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -63,19 +64,15 @@ public class PaymentService {
             return handleFailure(transaction, "Payment failed");
         }
 
+        transaction.setCorebankReference(debitResponse.getCorebankReference());
+        transaction.setBillerReference(billerResponse.getBillerReference());
         transaction.setStatus(StatusEnum.SUCCESS);
         transaction.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(transaction);
 
         // TODO Publish event to Kafka
 
-        return PaymentResponse.builder()
-            .transactionId(transaction.getId().toString())
-            .orderId(request.getOrderId())
-            .status("SUCCESS")
-            .corebankReference(debitResponse.getCorebankReference()) 
-            .billerReference(billerResponse.getBillerReference())
-            .build();
+        return TransactionMapper.toPaymentResponse(transaction);
     }
 
     private PaymentResponse handleFailure(Transaction transaction, String message) {
@@ -90,5 +87,12 @@ public class PaymentService {
             .status("FAILED")
             .message(message)
             .build();
+    }
+
+    public PaymentResponse get(UUID transactionId) {
+        Transaction transaction = transactionRepository.findById(transactionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+
+        return TransactionMapper.toPaymentResponse(transaction);
     }
 }
