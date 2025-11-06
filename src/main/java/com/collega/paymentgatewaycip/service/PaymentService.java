@@ -20,6 +20,7 @@ import com.collega.paymentgatewaycip.feignclient.BillerClient;
 import com.collega.paymentgatewaycip.feignclient.CoreBankingClient;
 import com.collega.paymentgatewaycip.mapper.TransactionMapper;
 import com.collega.paymentgatewaycip.model.Transaction;
+import com.collega.paymentgatewaycip.producer.EventProducer;
 import com.collega.paymentgatewaycip.repository.TransactionRepository;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -39,6 +40,8 @@ public class PaymentService {
     private final CoreBankingClient coreBankingClient;
 
     private final BillerClient billerClient;
+
+    private final EventProducer eventProducer;
 
     @Transactional
     @CircuitBreaker(name = "billerBreaker", fallbackMethod = "billerBreakerFallback") // Ganti anotasi menjadi @Retry untuk menerapkan mekanisme retry
@@ -82,9 +85,11 @@ public class PaymentService {
 
         LOGGER.debug("Transaction completed successfully, transactionId={}, status=SUCCESS", transaction.getId());
 
-        // TODO Publish event to Kafka
+        PaymentResponse response = TransactionMapper.toPaymentResponse(transaction);
 
-        return TransactionMapper.toPaymentResponse(transaction);
+        eventProducer.publishEvent("transaction.success", response);
+
+        return response;
     }
 
     public PaymentResponse billerBreakerFallback(PaymentRequest req, Exception ex) {
