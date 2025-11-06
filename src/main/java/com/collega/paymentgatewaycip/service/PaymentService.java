@@ -3,6 +3,8 @@ package com.collega.paymentgatewaycip.service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PaymentService.class);
     
     private final TransactionRepository transactionRepository;
 
@@ -37,6 +41,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse create(PaymentRequest request) {
+        LOGGER.debug("Processing payment request for orderId={}", request.getOrderId());
         validationService.validate(request);
         validationService.validateChannel(request.getChannel());
 
@@ -52,12 +57,16 @@ public class PaymentService {
         
         transactionRepository.save(transaction);
 
+        LOGGER.debug("Transaction saved with status=PENDING, transactionId={}", transaction.getId());
+
+        LOGGER.debug("Calling core banking debit for account={}, amount={}", request.getAccount(), request.getAmount());
         DebitRequest debitRequest = new DebitRequest(request.getAccount(), request.getAmount());
         DebitResponse debitResponse = coreBankingClient.debit(debitRequest);
         if (debitResponse.getStatus().equals("FAILED")) {
             return handleFailure(transaction, "Insufficient balance");
         }
 
+        LOGGER.debug("Calling biller for orderId={}, amount={}", request.getOrderId(), request.getAmount());
         BillerRequest billerRequest = new BillerRequest(request.getOrderId(), request.getAmount(), request.getPaymentMethod());
         BillerResponse billerResponse = billerClient.pay(billerRequest);
         if (billerResponse.getStatus().equals("FAILED")) {
@@ -69,6 +78,8 @@ public class PaymentService {
         transaction.setStatus(StatusEnum.SUCCESS);
         transaction.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(transaction);
+
+        LOGGER.debug("Transaction completed successfully, transactionId={}, status=SUCCESS", transaction.getId());
 
         // TODO Publish event to Kafka
 
