@@ -22,6 +22,7 @@ import com.collega.paymentgatewaycip.mapper.TransactionMapper;
 import com.collega.paymentgatewaycip.model.Transaction;
 import com.collega.paymentgatewaycip.repository.TransactionRepository;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -40,8 +41,9 @@ public class PaymentService {
     private final BillerClient billerClient;
 
     @Transactional
+    @CircuitBreaker(name = "billerBreaker", fallbackMethod = "billerBreakerFallback") // Ganti anotasi menjadi @Retry untuk menerapkan mekanisme retry
     public PaymentResponse create(PaymentRequest request) {
-        LOGGER.debug("Processing payment request for orderId={}", request.getOrderId());
+        LOGGER.info("Processing payment request for orderId={}", request.getOrderId());
         validationService.validate(request);
         validationService.validateChannel(request.getChannel());
 
@@ -59,17 +61,16 @@ public class PaymentService {
 
         LOGGER.debug("Transaction saved with status=PENDING, transactionId={}", transaction.getId());
 
-        LOGGER.debug("Calling core banking debit for account={}, amount={}", request.getAccount(), request.getAmount());
         DebitRequest debitRequest = new DebitRequest(request.getAccount(), request.getAmount());
         DebitResponse debitResponse = coreBankingClient.debit(debitRequest);
-        if (debitResponse.getStatus().equals("FAILED")) {
+        if ("FAILED".equals(debitResponse.getStatus())) {
             return handleFailure(transaction, "Insufficient balance");
         }
 
         LOGGER.debug("Calling biller for orderId={}, amount={}", request.getOrderId(), request.getAmount());
         BillerRequest billerRequest = new BillerRequest(request.getOrderId(), request.getAmount(), request.getPaymentMethod());
         BillerResponse billerResponse = billerClient.pay(billerRequest);
-        if (billerResponse.getStatus().equals("FAILED")) {
+        if ("FAILED".equals(billerResponse.getStatus())) {
             return handleFailure(transaction, "Payment failed");
         }
 
@@ -84,6 +85,15 @@ public class PaymentService {
         // TODO Publish event to Kafka
 
         return TransactionMapper.toPaymentResponse(transaction);
+    }
+
+    public PaymentResponse billerBreakerFallback(PaymentRequest req, Exception ex) {
+        LOGGER.warn("Fallback biller request: {}", ex.getMessage());
+        return PaymentResponse.builder()
+            .orderId(req.getOrderId())
+            .status("FAILED")
+            .message("Biller is currently unavailable. Please try again shortly.")
+            .build();
     }
 
     private PaymentResponse handleFailure(Transaction transaction, String message) {
