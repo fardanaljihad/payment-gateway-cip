@@ -16,14 +16,12 @@ import com.collega.paymentgatewaycip.dto.DebitResponse;
 import com.collega.paymentgatewaycip.dto.PaymentRequest;
 import com.collega.paymentgatewaycip.dto.PaymentResponse;
 import com.collega.paymentgatewaycip.enums.StatusEnum;
-import com.collega.paymentgatewaycip.feignclient.BillerClient;
 import com.collega.paymentgatewaycip.feignclient.CoreBankingClient;
 import com.collega.paymentgatewaycip.mapper.TransactionMapper;
 import com.collega.paymentgatewaycip.model.Transaction;
 import com.collega.paymentgatewaycip.producer.EventProducer;
 import com.collega.paymentgatewaycip.repository.TransactionRepository;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -39,12 +37,11 @@ public class PaymentService {
 
     private final CoreBankingClient coreBankingClient;
 
-    private final BillerClient billerClient;
+    private final BillerService billerService;
 
     private final EventProducer eventProducer;
 
     @Transactional
-    @CircuitBreaker(name = "billerBreaker", fallbackMethod = "billerBreakerFallback") // Ganti anotasi menjadi @Retry untuk menerapkan mekanisme retry
     public PaymentResponse create(PaymentRequest request) {
         LOGGER.info("Processing payment request for orderId={}", request.getOrderId());
         validationService.validate(request);
@@ -72,9 +69,9 @@ public class PaymentService {
 
         LOGGER.debug("Calling biller for orderId={}, amount={}", request.getOrderId(), request.getAmount());
         BillerRequest billerRequest = new BillerRequest(request.getOrderId(), request.getAmount(), request.getPaymentMethod());
-        BillerResponse billerResponse = billerClient.pay(billerRequest);
+        BillerResponse billerResponse = billerService.pay(billerRequest);
         if ("FAILED".equals(billerResponse.getStatus())) {
-            return handleFailure(transaction, "Payment failed");
+            return handleFailure(transaction, "Biller is currently unavailable.");
         }
 
         transaction.setCorebankReference(debitResponse.getCorebankReference());
@@ -90,15 +87,6 @@ public class PaymentService {
         eventProducer.publishEvent("transaction.success", response);
 
         return response;
-    }
-
-    public PaymentResponse billerBreakerFallback(PaymentRequest req, Exception ex) {
-        LOGGER.warn("Fallback biller request: {}", ex.getMessage());
-        return PaymentResponse.builder()
-            .orderId(req.getOrderId())
-            .status("FAILED")
-            .message("Biller is currently unavailable. Please try again shortly.")
-            .build();
     }
 
     private PaymentResponse handleFailure(Transaction transaction, String message) {

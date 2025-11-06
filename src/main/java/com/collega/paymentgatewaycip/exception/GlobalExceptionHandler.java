@@ -52,15 +52,8 @@ public class GlobalExceptionHandler {
 
         LOGGER.warn("Bad request: {} on path {}", ex.getReason(), req.getRequestURI());
 
-        String status = "FAILED";
-
-        if (ex.getReason().equals("Transaction not found")) {
-            status = null;
-        }
-
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
             PaymentResponse.builder()
-                .status(status)
                 .message(ex.getReason())
                 .build()
         );
